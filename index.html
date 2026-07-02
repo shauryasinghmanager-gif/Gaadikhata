@@ -856,8 +856,60 @@ function openSettings(){
     <div class="field"><label>Default base fare (₹)</label><input type="number" id="s-base" value="${s.baseFare}"></div>
     <button class="btn primary" onclick="saveSettings()">Save Settings</button>
     <button class="btn ghost" onclick="closeSheet()">Cancel</button>
+
+    <div style="height:1px;background:var(--border);margin:20px 0;"></div>
+
+    <h3>Backup &amp; Restore</h3>
+    <div class="info-note">Your data lives only in this browser, tied to this file. Export a backup regularly — especially before updating to a new version of this app — so nothing is ever lost.</div>
+    <button class="btn ghost" style="margin-top:12px;" onclick="exportBackup()">⬇ Export Backup (.json)</button>
+    <label class="btn ghost" style="display:block; text-align:center; cursor:pointer;">
+      ⬆ Restore from Backup
+      <input type="file" accept="application/json" onchange="importBackup(event)" style="display:none;">
+    </label>
+
     <div class="info-note" style="margin-top:14px;">All your data stays on this phone only, saved right in this browser. No account, no internet needed.</div>
   `);
+}
+function exportBackup(){
+  const payload = JSON.stringify(state, null, 2);
+  const blob = new Blob([payload], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  const stamp = todayISO();
+  a.href = url;
+  a.download = `gaadikhata-backup-${stamp}.json`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+function importBackup(evt){
+  const file = evt.target.files[0];
+  if(!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e){
+    try{
+      const data = JSON.parse(e.target.result);
+      if(!data || typeof data !== 'object') throw new Error('bad file');
+      const ok = confirm('Restoring will replace all current data on this device with the backup. Continue?');
+      if(!ok) return;
+      state = {
+        settings: data.settings || {ratePerKm:15, baseFare:0, currency:'₹'},
+        driver: data.driver || {name:'', paymentType:'perTrip', rate:0, phone:''},
+        trips: data.trips || [],
+        expenses: data.expenses || [],
+        driverPayments: data.driverPayments || []
+      };
+      saveState();
+      closeSheet();
+      fillQuoteDefaults();
+      renderAll();
+      alert('Backup restored successfully.');
+    }catch(err){
+      alert('Could not read this file. Make sure it\'s a GaadiKhata backup JSON file.');
+    }
+  };
+  reader.readAsText(file);
 }
 function saveSettings(){
   state.settings.ratePerKm = document.getElementById('s-rate').value || 0;
